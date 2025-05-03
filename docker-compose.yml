@@ -1,0 +1,15 @@
+services:
+    n8n:
+        image: n8nio/n8n:1.91.1
+        restart: unless-stopped
+        ports:
+            - '5678:5678'
+        environment:
+            - TZ=${TZ:-Asia/Tokyo}
+            - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+        volumes:
+            - n8n-storage:/home/node/.n8n
+
+volumes:
+    n8n-storage:
+        driver: local

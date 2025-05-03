@@ -1,0 +1,5 @@
+# Environment variables
+.env
+
+# Docker volumes (optional, if mapped locally outside Docker)
+# n8n-storage/ 
