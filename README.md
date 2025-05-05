@@ -16,7 +16,7 @@ Docker Compose を使用して n8n 環境を構築します。
 
 1.  **リポジトリのクローン:**
     ```bash
-    git clone https://github.com/<your-username>/n8n-docker-compose.git
+    git clone https://github.com/digila/n8n-docker-compose.git
     cd n8n-docker-compose
     ```
 
