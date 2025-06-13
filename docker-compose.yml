@@ -7,6 +7,7 @@ services:
         environment:
             - TZ=${TZ:-Asia/Tokyo}
             - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+            - N8N_HOST=${N8N_HOST}
         volumes:
             - n8n-data:/home/node/.n8n
 
