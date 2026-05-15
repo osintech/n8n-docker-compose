@@ -28,6 +28,18 @@
    docker compose up -d
    ```
 
+## n8n のバージョン更新
+
+本番では Docker image のタグを固定します。タグなしの `n8nio/n8n` は、再 pull や再作成のタイミングで意図せず n8n のバージョンが変わるため使いません。
+
+更新する場合は、`docker-compose.yml` の `image` を明示的なタグへ変更して PR を作ります。反映前に n8n のデータをバックアップし、更新後にワークフローの手動実行で主要な通知経路を確認します。
+
+現在の指定:
+
+```yaml
+image: docker.n8n.io/n8nio/n8n:2.20.8
+```
+
 ## ワークフロー管理
 
 `workflows/` に n8n ワークフローの JSON エクスポートを保存します。
