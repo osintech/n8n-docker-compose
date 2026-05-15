@@ -64,6 +64,42 @@ npm test
 node --test test/*.test.js
 ```
 
+## 本番ワークフロー反映手順
+
+Git の `workflows/` にある JSON を変更しただけでは、本番 n8n の実行内容は変わりません。本番へ反映するには、n8n 本体の workflow を更新し、そのドラフトを publish して有効版にする必要があります。
+
+1. PR を merge した後、本番サーバーでこのリポジトリを最新化します。
+
+   ```bash
+   git pull
+   ```
+
+2. n8n 本体の対象 workflow を Git の JSON と同じ内容に更新します。
+
+   MCP や n8n UI で更新できます。MCP で更新する場合も、更新後はドラフトのままなので publish まで行ってください。
+
+3. publish 前に手動実行で確認します。
+
+   Sentry 連携や HTTP Request node など credential を使う node は、MCP 更新時に credential の紐付けが外れることがあります。必ず実行結果で外部 API 取得まで成功していることを確認してください。
+
+4. publish して有効版を切り替えます。
+
+5. publish 後に production 実行でもう一度確認します。
+
+   Mattermost など外部投稿を含む workflow は実際に投稿されます。確認時は実行回数を最小限にし、実行番号と投稿内容を控えます。
+
+`Sentry Issue to Mattermost Notification` では、`Resolve Environment` の出力に以下が入ることを確認します。
+
+- `notificationEnvironment`: Sentry latest event の実 environment
+- `environmentSource`: `latest_event`
+- `latestEventId`: latest event の `id` または `eventID`
+
+environment の解決順序は以下です。
+
+```text
+latest_event > webhook > issue > baggage > unknown
+```
+
 ## 運用方針
 
 - n8n UI でワークフローを変更したら、JSON エクスポートを `workflows/` に反映して PR を作ります。
