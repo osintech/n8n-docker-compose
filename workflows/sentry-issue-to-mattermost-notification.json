@@ -1,0 +1,267 @@
+{
+  "name": "Sentry Issue to Mattermost Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sentry-alert",
+        "options": {}
+      },
+      "id": "57d173c6-65bc-4176-87ed-be6d2ccc09cf",
+      "name": "Sentry Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        64,
+        208
+      ],
+      "webhookId": "8329a4d5-35e3-4332-95c9-9925ae2f5920"
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "issueId": "={{ $json.body.data.issue.id }}"
+      },
+      "id": "f78d805d-07aa-446c-b946-d25192174530",
+      "name": "Get Issue Details",
+      "type": "n8n-nodes-base.sentryIo",
+      "typeVersion": 1,
+      "position": [
+        288,
+        208
+      ],
+      "credentials": {
+        "sentryIoApi": {
+          "id": "aJw01gQnyGA7RfIr",
+          "name": "Sentry.io account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Sentry Webhook').item.json.body.data.issue.url + \"events/latest/\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "sentryIoApi",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "05a4bbb5-bc00-4a92-83a7-596cebe1b4bc",
+      "name": "Get Latest Issue Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        512,
+        208
+      ],
+      "credentials": {
+        "sentryIoApi": {
+          "id": "aJw01gQnyGA7RfIr",
+          "name": "Sentry.io account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const webhook = $(\"Sentry Webhook\").first().json;\nconst issue = $(\"Get Issue Details\").first().json;\nconst event = $input.first().json;\nconst body = webhook.body ?? {};\nconst bodyEvent = body.data?.event ?? body.event ?? {};\n\nconst getTagValue = (tags, key) => {\n  if (!tags) return undefined;\n  if (Array.isArray(tags)) {\n    const found = tags.find((tag) => Array.isArray(tag) ? tag[0] === key : tag?.key === key || tag?.name === key);\n    return found ? (Array.isArray(found) ? found[1] : found.value) : undefined;\n  }\n  return typeof tags === \"object\" ? tags[key] : undefined;\n};\n\nconst baggageMatch = webhook.headers?.baggage?.match(/(?:^|,)sentry-environment=([^,]+)/);\nlet baggageEnvironment = baggageMatch ? baggageMatch[1] : undefined;\nif (baggageEnvironment) {\n  try {\n    baggageEnvironment = decodeURIComponent(baggageEnvironment);\n  } catch {\n    // 通知処理を止めないため、元の値を使う。\n  }\n}\n\nconst eventEnvironment = event.environment ?? getTagValue(event.tags, \"environment\");\nconst bodyEnvironment = bodyEvent.environment ?? getTagValue(bodyEvent.tags, \"environment\") ?? body.data?.environment ?? body.environment;\nconst issueEnvironment = issue.environment ?? getTagValue(issue.tags, \"environment\") ?? issue.metadata?.environment;\nconst notificationEnvironment = eventEnvironment ?? bodyEnvironment ?? issueEnvironment ?? baggageEnvironment ?? \"unknown\";\nconst environmentSource = eventEnvironment ? \"latest_event\" : bodyEnvironment ? \"webhook\" : issueEnvironment ? \"issue\" : baggageEnvironment ? \"baggage\" : \"unknown\";\n\nreturn [{\n  json: {\n    ...issue,\n    notificationEnvironment,\n    environmentSource,\n    latestEventId: event.id ?? event.eventID ?? null,\n  },\n}];"
+      },
+      "id": "152fb0c3-9ca8-43b8-a989-fc92669ed30b",
+      "name": "Resolve Environment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "channelId": "ere9oretm7nk9ygs66z7gcsmjh",
+        "message": "=🚨 **{{ $json.project.name }}** [{{ $json.notificationEnvironment }}]\n\n[{{ $json.title }}]({{ $json.permalink }})\n\n| 項目 | 内容 |\n|------|------|\n| 🕐 発生時刻 | {{ new Date($json.lastSeen).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) }} |\n| 📍 発生場所 | {{ $json.culprit.length > 50 ? $json.culprit.substring(0, 47) + \"...\" : $json.culprit }} |\n| 📊 影響範囲 | {{ $json.count }}回発生 / {{ $json.userCount }}ユーザー |",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.mattermost",
+      "typeVersion": 1,
+      "position": [
+        960,
+        208
+      ],
+      "id": "61a226b9-2c5c-4aa6-8ab8-6f85fef5ad8d",
+      "name": "Post a message",
+      "credentials": {
+        "mattermostApi": {
+          "id": "z6UkgzLJ2MgXOT0W",
+          "name": "Mattermost account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Sentry Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "process-01.rulewatcher.server-on.net:5678",
+            "sentry-trace": "1356fe1c770f41969280c8585ebe5931-92f8e57ee6810289-1",
+            "baggage": "sentry-trace_id=1356fe1c770f41969280c8585ebe5931,sentry-environment=prod,sentry-release=backend%40cd271e966abd44c30f270ed76bf3fe77dc9d085e,sentry-public_key=16427b2f210046b585ee51fd8a1ac54f,sentry-sample_rand=0.543422,sentry-sample_rate=1.0",
+            "user-agent": "sentry/25.9.0.dev0 (https://sentry.io)",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept": "*/*",
+            "connection": "keep-alive",
+            "content-type": "application/json",
+            "request-id": "c3e510a84dfd443e9960b3e8446ed955",
+            "sentry-hook-resource": "issue",
+            "sentry-hook-timestamp": "1755327066",
+            "sentry-hook-signature": "630f1f40fd95491e30bc5e8e5fb5db4d2bd73ccef758251ea83cb6c79b66b340",
+            "content-length": "1319"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "action": "created",
+            "installation": {
+              "uuid": "c707b3ee-f803-4af5-8ee7-ce4ccd0ecdb7"
+            },
+            "data": {
+              "issue": {
+                "url": "https://sentry.io/api/0/organizations/osin-tech/issues/6813625483/",
+                "web_url": "https://osin-tech.sentry.io/issues/6813625483/",
+                "project_url": "https://osin-tech.sentry.io/issues/?project=4507644187508736",
+                "id": "6813625483",
+                "shareId": null,
+                "shortId": "WOLF-BACK-Z",
+                "title": "test message",
+                "culprit": "",
+                "permalink": "https://osin-tech.sentry.io/issues/6813625483/",
+                "logger": null,
+                "level": "error",
+                "status": "unresolved",
+                "statusDetails": {},
+                "substatus": "new",
+                "isPublic": false,
+                "platform": "ruby",
+                "project": {
+                  "id": "4507644187508736",
+                  "name": "wolf-back",
+                  "slug": "wolf-back",
+                  "platform": "ruby-rails"
+                },
+                "type": "default",
+                "metadata": {
+                  "title": "test message",
+                  "in_app_frame_mix": "mixed",
+                  "sdk": {
+                    "name": "sentry.ruby",
+                    "name_normalized": "sentry.ruby"
+                  },
+                  "initial_priority": 75
+                },
+                "numComments": 0,
+                "assignedTo": null,
+                "isBookmarked": false,
+                "isSubscribed": false,
+                "subscriptionDetails": null,
+                "hasSeen": false,
+                "annotations": [],
+                "issueType": "error",
+                "issueCategory": "error",
+                "priority": "high",
+                "priorityLockedAt": null,
+                "seerFixabilityScore": null,
+                "seerAutofixLastTriggered": null,
+                "isUnhandled": false,
+                "count": "1",
+                "userCount": 0,
+                "firstSeen": "2025-08-16T06:50:43+00:00",
+                "lastSeen": "2025-08-16T06:50:43+00:00"
+              }
+            },
+            "actor": {
+              "type": "application",
+              "id": "sentry",
+              "name": "Sentry"
+            }
+          },
+          "webhookUrl": "http://process-01.rulewatcher.server-on.net:5678/webhook/sentry-alert",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Sentry Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Issue Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Issue Details": {
+      "main": [
+        [
+          {
+            "node": "Get Latest Issue Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Latest Issue Event": {
+      "main": [
+        [
+          {
+            "node": "Resolve Environment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Environment": {
+      "main": [
+        [
+          {
+            "node": "Post a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post a message": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "timezone": "Asia/Tokyo",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "18d8e8f1-35eb-4a83-8277-9f6531422c33",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fac7760a18b8390a65c84cafa73fe2454a394a7b8301ce431fe835dcd463c144"
+  },
+  "id": "8hxe7EpKUHONupb2",
+  "tags": []
+}

@@ -1,0 +1,7 @@
+{
+  "name": "n8n-docker-compose",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
